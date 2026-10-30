@@ -25,20 +25,20 @@ class AnalysisWorker(QObject):
             self.failed.emit(str(exc))
 
 
-class ChatWorker(QObject):
+class LetterWorker(QObject):
     finished = Signal(str)
     failed = Signal(str)
 
-    def __init__(self, service: DocumentService, document_id: int, question: str) -> None:
+    def __init__(self, service: DocumentService, document_id: int, kind: str) -> None:
         super().__init__()
         self.service = service
         self.document_id = document_id
-        self.question = question
+        self.kind = kind
 
     @Slot()
     def run(self) -> None:
         try:
-            answer = self.service.ask(self.document_id, self.question)
-            self.finished.emit(answer)
+            letter = self.service.draft_letter(self.document_id, self.kind)
+            self.finished.emit(letter)
         except Exception as exc:
             self.failed.emit(str(exc))

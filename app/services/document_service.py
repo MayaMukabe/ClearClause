@@ -1,15 +1,16 @@
-"""Application logic that coordinates storage, extraction, and analysis."""
+"""Coordinate storage, extraction, analysis, and letter drafts."""
 
 from __future__ import annotations
 
 import shutil
+from datetime import datetime
 from pathlib import Path
 
-from app.ai.analyzer import analyze_contract
-from app.ai.assistant import answer_question
-from app.config import documents_dir
+from app.ai.analyzer import analyze_document
+from app.ai.letters import draft_letter
+from app.config import documents_dir, get_model
 from app.database.db import Database
-from app.document_processing.extractor import extract_document
+from app.document_processing.extractor import extract_document, extract_from_text
 from app.models.types import AnalysisResult, DocumentRecord
 
 
@@ -17,22 +18,40 @@ class DocumentService:
     def __init__(self, db: Database | None = None) -> None:
         self.db = db or Database()
 
-    def import_file(self, source: str | Path, category: str = "legal") -> DocumentRecord:
+    def import_file(self, source: str | Path) -> DocumentRecord:
         source_path = Path(source)
         extracted = extract_document(source_path)
-        stored = documents_dir() / f"{source_path.stem}_{_safe_stamp()}{source_path.suffix.lower()}"
+        stored = documents_dir() / f"{source_path.stem}_{_stamp()}{source_path.suffix.lower()}"
         stored.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, stored)
-        notes = "\n".join(extracted.notes)
-        doc_id = self.db.insert_document(
+        return self._save_extracted(
             name=source_path.name,
             original_path=str(source_path),
             stored_path=str(stored),
+            extracted=extracted,
+        )
+
+    def import_text(self, text: str, name: str = "pasted-text.txt") -> DocumentRecord:
+        extracted = extract_from_text(text, name=name)
+        stored = documents_dir() / f"pasted_{_stamp()}.txt"
+        stored.write_text(text, encoding="utf-8")
+        return self._save_extracted(
+            name=name,
+            original_path="",
+            stored_path=str(stored),
+            extracted=extracted,
+        )
+
+    def _save_extracted(self, *, name: str, original_path: str, stored_path: str, extracted) -> DocumentRecord:
+        doc_id = self.db.insert_document(
+            name=name,
+            original_path=original_path,
+            stored_path=stored_path,
             file_type=extracted.file_type,
-            category=category,
+            category="health",
             extracted_text=extracted.full_text,
             page_count=extracted.page_count,
-            extraction_notes=notes,
+            extraction_notes="\n".join(extracted.notes),
         )
         record = self.db.get_document(doc_id)
         if record is None:
@@ -48,35 +67,26 @@ class DocumentService:
             raise ValueError("No text could be extracted from this document.")
         self.db.update_status(document_id, "analyzing")
         try:
-            from app.config import get_model
-
-            result = analyze_contract(text, category=record.category)
-            notes = record.extraction_notes.strip()
-            if notes:
-                extra = [n for n in notes.splitlines() if n]
-                result.processing_notes = extra + result.processing_notes
+            result = analyze_document(text)
+            notes = [line for line in record.extraction_notes.splitlines() if line]
+            result.processing_notes = notes + result.processing_notes
             self.db.save_analysis(document_id, result, get_model())
             return result
         except Exception:
             self.db.update_status(document_id, "error")
             raise
 
-    def ask(self, document_id: int, question: str) -> str:
+    def draft_letter(self, document_id: int, kind: str) -> str:
         record = self.db.get_document(document_id)
         if record is None:
-            raise ValueError("Select a document before asking a question.")
+            raise ValueError("Upload or paste a document first.")
         text = self.db.get_extracted_text(document_id)
-        history = self.db.get_chat_history(document_id)
-        self.db.add_chat_message(document_id, "user", question)
-        answer = answer_question(
-            document_text=text,
-            question=question,
-            history=history,
+        return draft_letter(
+            kind=kind,
             document_name=record.name,
-            category=record.category,
+            document_text=text,
+            analysis=record.analysis,
         )
-        self.db.add_chat_message(document_id, "assistant", answer)
-        return answer
 
     def delete(self, document_id: int) -> None:
         stored = self.db.delete_document(document_id)
@@ -86,7 +96,5 @@ class DocumentService:
                 path.unlink()
 
 
-def _safe_stamp() -> str:
-    from datetime import datetime
-
+def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d%H%M%S")

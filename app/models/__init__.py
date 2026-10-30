@@ -1,3 +1,3 @@
-from app.models.types import AnalysisResult, Clause, DocumentRecord, Overview
+from app.models.types import AnalysisResult, DocumentRecord, Finding, Overview
 
-__all__ = ["AnalysisResult", "Clause", "DocumentRecord", "Overview"]
+__all__ = ["AnalysisResult", "DocumentRecord", "Finding", "Overview"]

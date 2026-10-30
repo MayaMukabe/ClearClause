@@ -1,83 +1,160 @@
 # ClearClause AI
 
-**Understand Before You Sign.**
+**Understand Your Health Insurance.**
 
-ClearClause AI is a local desktop app that helps people understand contracts, agreements, and other dense documents. Upload a file, and the app extracts the text on your computer, then uses the OpenAI API to explain clauses, flag potential risks, and answer questions in plain language.
+ClearClause AI is a one-page web app that helps people read health insurance paperwork in plain language. You upload an explanation of benefits (EOB), denial letter, bill, coverage notice, or similar document. The app extracts the text, asks an AI to explain it, flags high / medium / low risk items, and can draft a **claim** or **appeal** letter.
 
-This is an informational tool. It does not provide legal advice.
+This is an informational student project. It does **not** provide legal, medical, or insurance advice. Always check the original document before you send anything to an insurer.
 
-## Features
+Live on your computer: **http://127.0.0.1:8000** (only while the app is running).
 
-- Upload PDF, Word (DOCX), and text documents, including drag-and-drop
-- Local text extraction with optional OCR for scanned PDFs (if Tesseract is installed)
-- Structured contract analysis: overview, clauses, risk levels, and a **Before You Sign** section
-- Plain-language translator for selected clauses
-- Document-grounded AI assistant with follow-up questions
-- SQLite history so analyses remain after you quit
-- Privacy notice before text is sent to OpenAI
+---
 
-## Requirements
+## What is going on
 
-- Python 3.10 or newer
-- An [OpenAI API key](https://platform.openai.com/api-keys)
-- Optional: [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) for scanned PDFs
+| Piece | What it does |
+| --- | --- |
+| Browser page (`web/`) | The screen you see: upload, analyze, summary, risks, claim/appeal |
+| Python server (`web/app.py`) | Receives the file, extracts text, calls the AI, returns results |
+| Document extraction | Reads PDF, Word, images, or pasted text (OCR for scans when Tesseract is installed) |
+| AI | By default a **free local model** via [Ollama](https://ollama.com) (Llama 3.2). OpenAI is optional if you have credits |
+| SQLite | Saves analysis on this computer so claim/appeal can use the same document |
 
-## Setup
+**Default AI is local.** Document text stays on your Mac when `AI_PROVIDER=ollama`. If you switch to OpenAI, extracted text is sent to OpenAI.
+
+GitHub holds the **source code**. It does **not** run the app for visitors.
+
+---
+
+## How to use it (on this computer)
+
+### 1. One-time setup
+
+You need Python 3.10+ and the free Ollama app.
 
 ```bash
 cd "ClearClause"
 python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Open `.env` and set:
+Install and start Ollama, then download the model (about 2 GB, once):
+
+```bash
+# If Ollama is not installed: https://ollama.com/download
+ollama serve
+ollama pull llama3.2:3b
+```
+
+`.env` should look like:
 
 ```
+AI_PROVIDER=ollama
+OLLAMA_MODEL=llama3.2:3b
+OLLAMA_BASE_URL=http://127.0.0.1:11434/v1
+```
+
+Keep `.env` off GitHub. It is already in `.gitignore`.
+
+### 2. Start the app (two terminals)
+
+**Terminal A — local AI**
+
+```bash
+ollama serve
+```
+
+**Terminal B — website**
+
+```bash
+source .venv/bin/activate
+python main.py
+```
+
+Open **http://127.0.0.1:8000** in Chrome or Safari. Leave both terminals running.
+
+### 3. Analyze a document
+
+1. Click **Choose File** (PDF, Word, or image) or **Paste text**.
+2. Click **✦ Analyze Document**.
+3. Accept the privacy notice.
+4. Wait. A short page may take under a minute; a ~20-page contract on the local model often takes **2–6 minutes**.
+5. Read **Document Summary**, the risk tiles, and **Plain-Language Explanation**.
+6. Optionally click **Create a Claim** or **Create an Appeal**, then copy the draft and edit it yourself.
+
+A sample file is `tests/sample_eob.txt`.
+
+### Optional: OpenAI instead of Ollama
+
+Only if you have API credits. In `.env`:
+
+```
+AI_PROVIDER=openai
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-You can also paste the key later in **Settings**.
+Never commit that key. Never paste it into GitHub.
 
-## Run
+---
+
+## Can GitHub give me a public link?
+
+**No.** GitHub (and GitHub Pages) is for storing and showing **code**. This project is a Python server plus a local AI. GitHub Pages only hosts static files (HTML/CSS/JS). It cannot run FastAPI, extract PDFs, or run Ollama.
+
+Pushing to GitHub is still useful so teammates can **clone the repo and run it locally**. It does not create a website like `https://yourname.github.io/clearclause` that analyzes documents.
+
+### Ways to get a link other people can open
+
+| Option | What you get | Good for |
+| --- | --- | --- |
+| **http://127.0.0.1:8000** | Only you, on this Mac | Everyday testing |
+| **ngrok** (or Cloudflare Tunnel) | A temporary `https://….ngrok.app` URL that points at your laptop | A demo for class, as long as your Mac stays on |
+| **Render / Railway / Fly.io** | A real public site | Sharing 24/7, but you must use a **cloud AI** (OpenAI), not Ollama on your laptop |
+
+**GitHub is the repo. A host like Render (or a tunnel like ngrok) is the public link.**
+
+### Quick demo link with ngrok (laptop must stay on)
+
+1. Start Ollama and `python main.py` as above.
+2. Install [ngrok](https://ngrok.com/download), then:
 
 ```bash
-python main.py
+ngrok http 8000
 ```
 
-## Using the app
+3. Share the `https://…` URL ngrok prints. Anyone with that URL can use your app until you close ngrok or shut the laptop.
 
-1. Start on the **Dashboard**, which follows the ClearClause home layout.
-2. Choose **Legal Document** or **Health Document**.
-3. Upload a contract (try `tests/sample_lease.txt`).
-4. Confirm the privacy notice, then analyze.
-5. Review risks, key findings, and **Before You Sign**.
-6. Ask follow-up questions on the dashboard or in **AI Assistant**.
-7. Reopen past work from **My Documents**.
+Health documents will pass through your computer. Only share with people you trust, and stop ngrok when the demo ends.
 
-## Privacy
+### A lasting public website
 
-Uploaded files are copied into the local application data folder. When you request analysis or chat, extracted text is sent to OpenAI. OpenAI’s API data policies apply. Delete documents from **My Documents** to remove the stored file, analysis, and chat history from this computer.
+You would deploy this FastAPI app to a host (Render, Railway, Fly.io), set environment variables there, and use **OpenAI** (or another hosted API). Ollama will not run on GitHub Pages and usually will not run on a free static host.
 
-## Legal disclaimer
+If you do that:
 
-ClearClause AI is an informational tool designed to help individuals better understand legal documents. It does not provide legal advice and does not replace consultation with a licensed attorney. AI-generated explanations, summaries, and risk assessments may contain errors or omissions. Users should consult a qualified legal professional before making significant legal or financial decisions.
+- Put the API key in the host’s secret settings, not in the repo.
+- Remember you are sending insurance text to that AI provider.
+- Expect usage costs if traffic grows.
+
+---
 
 ## Project layout
 
 ```
-main.py
-app/
-  ui/                 Desktop interface
-  services/           Application workflow
-  ai/                 OpenAI analysis and assistant
-  document_processing Text extraction and sectioning
-  database/           SQLite storage
-  models/             Shared data types
-assets/images/        Unsplash photos used in the backdrop
-tests/
+main.py                 Starts the web server
+web/                    Browser UI and API
+app/ai/                 Prompts, analysis, claim/appeal drafts
+app/document_processing Extracts PDF / Word / images / text
+app/database/           Local SQLite history
+app/services/           Ties extraction + AI together
+tests/                  Sample EOB and unit tests
 ```
 
-Photos in `assets/images` are downloaded from [Unsplash](https://unsplash.com).
+---
+
+## Disclaimer
+
+ClearClause AI is an informational tool designed to help individuals better understand health insurance documents. It does not provide legal, medical, or insurance advice and does not replace a licensed professional or your insurer. AI-generated explanations, risk notes, claims, and appeals may contain errors or omissions. Confirm every detail against the original document before submitting anything to an insurer.

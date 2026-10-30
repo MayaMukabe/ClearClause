@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ClearClause AI — Understand Your Health Insurance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="scene">
+    <img class="decor plant" src="/assets/images/dried-flowers.jpg" alt="" />
+    <img class="decor mug" src="/assets/images/ceramic-mug.jpg" alt="" />
+    <img class="decor books" src="/assets/images/books.jpg" alt="" />
+
+    <main class="page">
+      <header class="hero">
+        <h1>ClearClause AI</h1>
+        <p class="tagline">Understand Your Health Insurance.</p>
+        <p class="blurb">Upload your health insurance documents, get clear explanations,<br />and create claims or appeals—all in one place.</p>
+      </header>
+
+      <section class="panel top-panel">
+        <div class="upload-box" id="dropZone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 48 48" width="42" height="42" aria-hidden="true">
+              <path d="M14 8h14l8 8v24H14z" fill="none" stroke="#8B4513" stroke-width="2"/>
+              <path d="M28 8v8h8" fill="none" stroke="#8B4513" stroke-width="2"/>
+              <path d="M24 20v12M18 26l6-6 6 6" fill="none" stroke="#8B4513" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2>Upload Your Health Document</h2>
+          <p class="muted">Drag and drop your file here or click to browse</p>
+          <p class="tiny">Supports PDF, Word, and image files</p>
+          <div class="upload-actions">
+            <label class="btn primary" for="fileInput">⬆ Choose File</label>
+            <button class="btn ghost" type="button" id="pasteBtn">Paste text</button>
+          </div>
+          <input id="fileInput" type="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp,.tif,.tiff" hidden />
+          <p class="file-name" id="fileName"></p>
+          <button class="btn analyze" type="button" id="analyzeBtn" disabled>✦ Analyze Document</button>
+        </div>
+
+        <div class="side-actions">
+          <button class="action-card" type="button" id="claimBtn">
+            <span class="action-icon">
+              <svg viewBox="0 0 48 48" width="28" height="28"><path d="M14 8h14l8 8v24H14z" fill="none" stroke="#8B4513" stroke-width="2"/><path d="M20 26h12M20 32h8M22 16h4v4h-4z" fill="none" stroke="#8B4513" stroke-width="2"/></svg>
+            </span>
+            <span class="action-copy">
+              <strong>Create a Claim</strong>
+              <small>Generate a clear, professional claim to submit to your insurer.</small>
+            </span>
+            <span class="chevron">›</span>
+          </button>
+          <button class="action-card" type="button" id="appealBtn">
+            <span class="action-icon">
+              <svg viewBox="0 0 48 48" width="28" height="28"><path d="M14 8h14l8 8v24H14z" fill="none" stroke="#8B4513" stroke-width="2"/><path d="M20 24h12M20 30h12M20 36h8" fill="none" stroke="#8B4513" stroke-width="2"/></svg>
+            </span>
+            <span class="action-copy">
+              <strong>Create an Appeal</strong>
+              <small>Request a review for a denied or underpaid claim.</small>
+            </span>
+            <span class="chevron">›</span>
+          </button>
+        </div>
+      </section>
+      <p class="status" id="status"></p>
+
+      <section class="bottom">
+        <article class="panel summary">
+          <h3>Document Summary</h3>
+          <ul>
+            <li>
+              <span class="row-icon">🛡</span>
+              <span>Insurance Provider</span>
+              <strong id="v-provider">—</strong>
+            </li>
+            <li>
+              <span class="row-icon">👤</span>
+              <span>Member Name</span>
+              <strong id="v-member">—</strong>
+            </li>
+            <li>
+              <span class="row-icon">📅</span>
+              <span>Service Date(s)</span>
+              <strong id="v-dates">—</strong>
+            </li>
+            <li>
+              <span class="row-icon">💵</span>
+              <span>Claim Number</span>
+              <strong id="v-claim">—</strong>
+            </li>
+            <li>
+              <span class="row-icon">📄</span>
+              <span>Document Type</span>
+              <strong id="v-type">—</strong>
+            </li>
+          </ul>
+        </article>
+
+        <article class="panel analysis">
+          <h3>AI Analysis</h3>
+          <p class="muted" id="analysisIntro">Your key information, risks, and explanations will appear here after upload.</p>
+          <div class="risks">
+            <div class="risk high">
+              <div class="risk-icon">❗</div>
+              <h4>High Risk</h4>
+              <p id="highCaption">Items that may need immediate attention.</p>
+            </div>
+            <div class="risk medium">
+              <div class="risk-icon">⚠</div>
+              <h4>Medium Risk</h4>
+              <p id="medCaption">Items to review or clarify.</p>
+            </div>
+            <div class="risk low">
+              <div class="risk-icon">✓</div>
+              <h4>Low Risk</h4>
+              <p id="lowCaption">Standard information with minimal concern.</p>
+            </div>
+          </div>
+          <div class="plain">
+            <h4>🔍 &nbsp; Plain-Language Explanation</h4>
+            <p id="plainLanguage">A clear explanation of your document will appear here.</p>
+          </div>
+        </article>
+      </section>
+
+      <p class="disclaimer" id="disclaimer"></p>
+    </main>
+  </div>
+
+  <div class="modal" id="privacyModal" hidden>
+    <div class="modal-card">
+      <h3>Before we analyze</h3>
+      <p id="privacyText"></p>
+      <label class="check"><input type="checkbox" id="privacyCheck" /> I understand and want to continue</label>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" data-close="privacyModal">Cancel</button>
+        <button class="btn primary" type="button" id="privacyContinue">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="pasteModal" hidden>
+    <div class="modal-card wide">
+      <h3>Paste health document text</h3>
+      <textarea id="pasteArea" placeholder="Paste an EOB, denial letter, bill, or coverage notice…"></textarea>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" data-close="pasteModal">Cancel</button>
+        <button class="btn primary" type="button" id="pasteSubmit">Analyze text</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="letterModal" hidden>
+    <div class="modal-card wide">
+      <h3 id="letterTitle">Draft</h3>
+      <p class="muted" id="letterStatus">Drafting from your document…</p>
+      <textarea id="letterText" readonly></textarea>
+      <div class="modal-actions">
+        <button class="btn primary" type="button" id="copyLetter">Copy letter</button>
+        <button class="btn ghost" type="button" data-close="letterModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="busy" id="busy" hidden>
+    <div class="spinner"></div>
+    <p>Working…</p>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

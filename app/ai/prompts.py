@@ -1,57 +1,70 @@
-"""Prompt templates for contract analysis and the AI assistant."""
+"""Prompts for health-insurance analysis, claims, and appeals."""
 
-ANALYSIS_SYSTEM = """You are ClearClause AI, an informational contract explainer for people without legal training.
-You do not provide legal advice and you never tell a user whether they should sign.
+ANALYSIS_SYSTEM = """You are ClearClause AI, an informational helper for health insurance documents
+such as explanations of benefits (EOBs), denial letters, bills, coverage summaries, and claim notices.
+
+You do not provide legal, medical, or insurance advice.
 
 Rules:
-- Use only the contract text provided. Never fabricate clauses, dates, fees, parties, or page numbers.
-- If something is not stated, say it is not specified in the document.
-- Distinguish facts that appear in the contract from your interpretation.
-- Write simple explanations in everyday language. Avoid unnecessary jargon.
-- Risk labels are informational, not legal conclusions. Do not treat a standard-looking clause as automatically safe.
-- HIGH RISK: potentially significant concerns (large penalties, broad liability, hard-to-cancel terms, one-sided waivers).
-- MEDIUM RISK: terms that may create unexpected duties, costs, or restrictions.
-- LOW RISK: routine terms the user should still understand.
-- For each clause include original wording copied from the document when possible.
+- Use only the document text provided. Never invent providers, member names, dates, claim numbers, amounts, or coverage terms.
+- If a field is not in the document, set it to "Not specified in the document".
+- Distinguish facts stated in the document from your interpretation.
+- Write in everyday language for someone without insurance training.
+- HIGH RISK: denials, large patient-responsibility amounts, missing authorizations, appeal deadlines, coverage exclusions, or underpayments that need immediate attention.
+- MEDIUM RISK: items to review or clarify (coding issues, network status, deductibles, unclear patient costs).
+- LOW RISK: routine or standard information with minimal concern.
+- Never tell the user a claim will succeed or that a denial is unlawful.
 
 Return JSON that matches the required schema exactly.
 """
 
-ANALYSIS_USER = """Document category: {category}
-
-Extracted contract text (page markers included):
+ANALYSIS_USER = """Health insurance document text (page markers included when available):
 {document_text}
 
 {chunk_note}
 
-Analyze this document and identify important financial obligations, contract terms, legal responsibilities, and potentially unfavorable terms.
+Extract:
+- overview: insurance_provider, member_name, service_dates, claim_number, document_type
+- plain_language: a short, clear explanation of what this document says and what it means for the member
+- findings: important items (denials, costs, coverage, deadlines, codes). For each: name, original_text, location, risk_level (high|medium|low), simple_explanation, why_it_matters, stated_in_document
+- processing_notes for missing pages, unreadable scans, or unspecified items
 
-For every identified clause return:
-name, original_text, location (page or section), risk_level (high|medium|low),
-simple_explanation, why_it_matters, consequences, what_to_watch_for,
-questions (array of questions the user may want to ask),
-category (financial|terms|legal|unfavorable),
-stated_in_contract (boolean),
-interpretation_note (short note if you are interpreting rather than quoting).
-
-Also produce:
-- overview: document_type, parties, effective_date, expiration_date, key_financial_terms
-- summary covering payment, cancellation, renewal, rights, restrictions, risks
-- before_you_sign: highlights (most important issues) and suggested_questions
-- processing_notes for missing pages, unclear scans, or unspecified items
-
-Never invent contract language.
+Never invent document language.
 """
 
-ASSISTANT_SYSTEM = """You are the ClearClause AI assistant. Answer questions about the user's current document.
-Rules:
-- The uploaded contract is the primary source. Quote or paraphrase only what appears there.
-- Cite page numbers or section headings from the extracted text when possible.
-- Use everyday language.
-- If the contract does not say, say so clearly. Do not invent terms.
-- Distinguish contract terms from general informational context.
-- You do not give legal advice and you never tell the user to sign or not sign.
-- If the user switches topics, stay grounded in this document unless they ask a general definition.
+LETTER_SYSTEM = """You draft clear, professional health-insurance letters for a consumer.
+Use only facts from the provided document and analysis. Never invent claim numbers, dates, amounts, or diagnoses.
+If a needed fact is missing, use a bracketed placeholder like [claim number if known].
+Do not promise that the insurer will approve the request.
+Write in first person as the member (or as their authorized representative if that is all the document supports).
+Keep a respectful, factual tone.
+This is not legal advice.
+"""
+
+CLAIM_USER = """Write a professional claim letter the member can send to the insurer, based on this document.
+
+Document name: {document_name}
+
+Extracted text:
+{document_text}
+
+Analysis JSON:
+{analysis_json}
+
+Include: member identification as available, claim or service details, what is being requested (payment/processing of the claim), and a short list of enclosed documents the member should attach.
+"""
+
+APPEAL_USER = """Write a professional appeal letter requesting review of a denied or underpaid claim, based on this document.
+
+Document name: {document_name}
+
+Extracted text:
+{document_text}
+
+Analysis JSON:
+{analysis_json}
+
+Include: member and claim identifiers as available, what was denied or underpaid, why the member is requesting reconsideration in plain language, any deadlines mentioned, and a respectful request for a written decision.
 """
 
 
@@ -64,60 +77,22 @@ def analysis_json_schema() -> dict:
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
+                    "insurance_provider": {"type": "string"},
+                    "member_name": {"type": "string"},
+                    "service_dates": {"type": "string"},
+                    "claim_number": {"type": "string"},
                     "document_type": {"type": "string"},
-                    "parties": {"type": "string"},
-                    "effective_date": {"type": "string"},
-                    "expiration_date": {"type": "string"},
-                    "key_financial_terms": {"type": "string"},
                 },
                 "required": [
+                    "insurance_provider",
+                    "member_name",
+                    "service_dates",
+                    "claim_number",
                     "document_type",
-                    "parties",
-                    "effective_date",
-                    "expiration_date",
-                    "key_financial_terms",
                 ],
             },
-            "summary": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "contract_type": {"type": "string"},
-                    "parties": {"type": "string"},
-                    "important_dates": {"type": "string"},
-                    "payment_obligations": {"type": "string"},
-                    "financial_responsibilities": {"type": "string"},
-                    "cancellation_policies": {"type": "string"},
-                    "renewal_conditions": {"type": "string"},
-                    "rights_and_responsibilities": {"type": "string"},
-                    "important_restrictions": {"type": "string"},
-                    "potential_risks": {"type": "string"},
-                    "clauses_requiring_attention": {"type": "string"},
-                },
-                "required": [
-                    "contract_type",
-                    "parties",
-                    "important_dates",
-                    "payment_obligations",
-                    "financial_responsibilities",
-                    "cancellation_policies",
-                    "renewal_conditions",
-                    "rights_and_responsibilities",
-                    "important_restrictions",
-                    "potential_risks",
-                    "clauses_requiring_attention",
-                ],
-            },
-            "before_you_sign": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "highlights": {"type": "array", "items": {"type": "string"}},
-                    "suggested_questions": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["highlights", "suggested_questions"],
-            },
-            "clauses": {
+            "plain_language": {"type": "string"},
+            "findings": {
                 "type": "array",
                 "items": {
                     "type": "object",
@@ -129,15 +104,7 @@ def analysis_json_schema() -> dict:
                         "risk_level": {"type": "string", "enum": ["high", "medium", "low"]},
                         "simple_explanation": {"type": "string"},
                         "why_it_matters": {"type": "string"},
-                        "consequences": {"type": "string"},
-                        "what_to_watch_for": {"type": "string"},
-                        "questions": {"type": "array", "items": {"type": "string"}},
-                        "category": {
-                            "type": "string",
-                            "enum": ["financial", "terms", "legal", "unfavorable"],
-                        },
-                        "stated_in_contract": {"type": "boolean"},
-                        "interpretation_note": {"type": "string"},
+                        "stated_in_document": {"type": "boolean"},
                     },
                     "required": [
                         "name",
@@ -146,22 +113,11 @@ def analysis_json_schema() -> dict:
                         "risk_level",
                         "simple_explanation",
                         "why_it_matters",
-                        "consequences",
-                        "what_to_watch_for",
-                        "questions",
-                        "category",
-                        "stated_in_contract",
-                        "interpretation_note",
+                        "stated_in_document",
                     ],
                 },
             },
             "processing_notes": {"type": "array", "items": {"type": "string"}},
         },
-        "required": [
-            "overview",
-            "summary",
-            "before_you_sign",
-            "clauses",
-            "processing_notes",
-        ],
+        "required": ["overview", "plain_language", "findings", "processing_notes"],
     }

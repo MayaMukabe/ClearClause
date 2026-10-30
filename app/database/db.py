@@ -34,7 +34,7 @@ class Database:
                     original_path TEXT,
                     stored_path TEXT,
                     file_type TEXT,
-                    category TEXT DEFAULT 'legal',
+                    category TEXT DEFAULT 'health',
                     uploaded_at TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'uploaded',
                     page_count INTEGER DEFAULT 0,

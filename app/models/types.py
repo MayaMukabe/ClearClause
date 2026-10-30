@@ -1,4 +1,4 @@
-"""Shared data models used across UI, AI, and database layers."""
+"""Shared data models for health-document analysis."""
 
 from __future__ import annotations
 
@@ -7,76 +7,66 @@ from datetime import datetime
 from typing import Any
 
 
+def _dash(value: Any) -> str:
+    text = str(value or "").strip()
+    return text if text else "—"
+
+
 @dataclass
 class Overview:
+    insurance_provider: str = "—"
+    member_name: str = "—"
+    service_dates: str = "—"
+    claim_number: str = "—"
     document_type: str = "—"
-    parties: str = "—"
-    effective_date: str = "—"
-    expiration_date: str = "—"
-    key_financial_terms: str = "—"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "Overview":
         data = data or {}
-        parties = data.get("parties", "—")
-        if isinstance(parties, list):
-            parties = ", ".join(str(p) for p in parties) or "—"
         return cls(
-            document_type=str(data.get("document_type") or "—"),
-            parties=str(parties or "—"),
-            effective_date=str(data.get("effective_date") or "—"),
-            expiration_date=str(data.get("expiration_date") or "—"),
-            key_financial_terms=str(data.get("key_financial_terms") or "—"),
+            insurance_provider=_dash(data.get("insurance_provider")),
+            member_name=_dash(data.get("member_name") or data.get("parties")),
+            service_dates=_dash(
+                data.get("service_dates")
+                or data.get("effective_date")
+                or data.get("service_date")
+            ),
+            claim_number=_dash(data.get("claim_number") or data.get("key_financial_terms")),
+            document_type=_dash(data.get("document_type")),
         )
 
 
 @dataclass
-class Clause:
+class Finding:
     name: str
     original_text: str
     location: str
     risk_level: str
     simple_explanation: str
-    why_it_matters: str
-    consequences: str
-    questions: list[str] = field(default_factory=list)
-    category: str = "terms"
-    stated_in_contract: bool = True
-    interpretation_note: str = ""
-    what_to_watch_for: str = ""
+    why_it_matters: str = ""
+    stated_in_document: bool = True
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Clause":
-        questions = data.get("questions") or []
-        if isinstance(questions, str):
-            questions = [questions]
+    def from_dict(cls, data: dict[str, Any]) -> "Finding":
         risk = str(data.get("risk_level") or "medium").lower()
         if risk not in {"high", "medium", "low"}:
             risk = "medium"
         return cls(
-            name=str(data.get("name") or "Unnamed clause"),
+            name=str(data.get("name") or "Item"),
             original_text=str(data.get("original_text") or ""),
-            location=str(data.get("location") or data.get("page") or "Unknown"),
+            location=str(data.get("location") or "Unknown"),
             risk_level=risk,
             simple_explanation=str(data.get("simple_explanation") or ""),
             why_it_matters=str(data.get("why_it_matters") or ""),
-            consequences=str(data.get("consequences") or ""),
-            questions=[str(q) for q in questions],
-            category=str(data.get("category") or "terms"),
-            stated_in_contract=bool(data.get("stated_in_contract", True)),
-            interpretation_note=str(data.get("interpretation_note") or ""),
-            what_to_watch_for=str(
-                data.get("what_to_watch_for") or data.get("consequences") or ""
-            ),
+            stated_in_document=bool(data.get("stated_in_document", data.get("stated_in_contract", True))),
         )
 
 
 @dataclass
 class AnalysisResult:
     overview: Overview = field(default_factory=Overview)
-    summary: dict[str, Any] = field(default_factory=dict)
-    before_you_sign: dict[str, Any] = field(default_factory=dict)
-    clauses: list[Clause] = field(default_factory=list)
+    plain_language: str = ""
+    findings: list[Finding] = field(default_factory=list)
     risk_counts: dict[str, int] = field(default_factory=dict)
     processing_notes: list[str] = field(default_factory=list)
     model: str = ""
@@ -85,9 +75,8 @@ class AnalysisResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "overview": asdict(self.overview),
-            "summary": self.summary,
-            "before_you_sign": self.before_you_sign,
-            "clauses": [asdict(c) for c in self.clauses],
+            "plain_language": self.plain_language,
+            "findings": [asdict(item) for item in self.findings],
             "risk_counts": self.risk_counts,
             "processing_notes": self.processing_notes,
             "model": self.model,
@@ -97,19 +86,24 @@ class AnalysisResult:
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "AnalysisResult":
         data = data or {}
-        clauses = [Clause.from_dict(c) for c in data.get("clauses") or []]
+        raw_findings = data.get("findings") or data.get("clauses") or []
+        findings = [Finding.from_dict(item) for item in raw_findings]
         counts = data.get("risk_counts") or {}
-        if not counts and clauses:
+        if not counts and findings:
             counts = {
-                "high": sum(1 for c in clauses if c.risk_level == "high"),
-                "medium": sum(1 for c in clauses if c.risk_level == "medium"),
-                "low": sum(1 for c in clauses if c.risk_level == "low"),
+                "high": sum(1 for item in findings if item.risk_level == "high"),
+                "medium": sum(1 for item in findings if item.risk_level == "medium"),
+                "low": sum(1 for item in findings if item.risk_level == "low"),
             }
         return cls(
             overview=Overview.from_dict(data.get("overview")),
-            summary=data.get("summary") or {},
-            before_you_sign=data.get("before_you_sign") or {},
-            clauses=clauses,
+            plain_language=str(
+                data.get("plain_language")
+                or data.get("plain_language_explanation")
+                or (data.get("summary") or {}).get("potential_risks")
+                or ""
+            ),
+            findings=findings,
             risk_counts={
                 "high": int(counts.get("high") or 0),
                 "medium": int(counts.get("medium") or 0),
@@ -143,7 +137,7 @@ class DocumentRecord:
             original_path=row.get("original_path") or "",
             stored_path=row.get("stored_path") or "",
             file_type=row.get("file_type") or "",
-            category=row.get("category") or "legal",
+            category=row.get("category") or "health",
             uploaded_at=row.get("uploaded_at") or datetime.now().isoformat(timespec="seconds"),
             status=row.get("status") or "uploaded",
             page_count=int(row.get("page_count") or 0),

@@ -10,19 +10,18 @@ from dotenv import load_dotenv
 
 LEGAL_DISCLAIMER = (
     "ClearClause AI is an informational tool designed to help individuals "
-    "better understand legal documents. It does not provide legal advice and "
-    "does not replace consultation with a licensed attorney. AI-generated "
-    "explanations, summaries, and risk assessments may contain errors or "
-    "omissions. Users should consult a qualified legal professional before "
-    "making significant legal or financial decisions."
+    "better understand health insurance documents. It does not provide legal, "
+    "medical, or insurance advice and does not replace a licensed professional "
+    "or your insurer. AI-generated explanations, risk notes, claims, and appeals "
+    "may contain errors or omissions. Confirm every detail against the original "
+    "document before submitting anything to an insurer."
 )
 
 PRIVACY_NOTICE = (
-    "When you analyze a document, extracted text from that file is sent to "
-    "OpenAI so the AI can generate summaries, risk assessments, and answers. "
-    "Uploaded files stay on this computer by default. OpenAI's API data "
-    "policies apply to any text submitted for analysis. Do not analyze "
-    "documents you are not authorized to share with a third-party AI service."
+    "When you analyze a document, extracted or pasted text is sent to the "
+    "selected AI. With the free local option (Ollama), text stays on this "
+    "computer. If OpenAI is selected, text is sent to OpenAI and their API "
+    "data policies apply. Do not upload documents you are not authorized to share."
 )
 
 SUPPORTED_MODELS = [
@@ -32,7 +31,17 @@ SUPPORTED_MODELS = [
     "gpt-4.1",
 ]
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt"}
+SUPPORTED_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".txt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".tif",
+    ".tiff",
+}
 
 
 def project_root() -> Path:
@@ -69,13 +78,6 @@ def database_path() -> Path:
     return user_data_dir() / "clearclause.db"
 
 
-def env_file_path() -> Path:
-    local = project_root() / ".env"
-    if local.exists():
-        return local
-    return user_data_dir() / ".env"
-
-
 def load_environment() -> None:
     load_dotenv(project_root() / ".env")
     load_dotenv(user_data_dir() / ".env", override=False)
@@ -92,8 +94,33 @@ def get_model() -> str:
     return model or "gpt-4o-mini"
 
 
+def get_provider() -> str:
+    """openai, ollama, or auto (OpenAI first, then free local Ollama)."""
+    load_environment()
+    value = os.environ.get("AI_PROVIDER", "ollama").strip().lower()
+    return value or "ollama"
+
+
+def get_ollama_model() -> str:
+    load_environment()
+    return os.environ.get("OLLAMA_MODEL", "llama3.2:3b").strip() or "llama3.2:3b"
+
+
+def ollama_base_url() -> str:
+    load_environment()
+    return os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1").strip()
+
+
+def ai_is_ready() -> bool:
+    provider = get_provider()
+    if provider == "openai":
+        return bool(get_api_key())
+    if provider == "ollama":
+        return True
+    return True
+
+
 def save_api_settings(api_key: str, model: str) -> Path:
-    """Persist API settings to a local .env file (not logged)."""
     target = project_root() / ".env"
     existing = ""
     if target.exists():

@@ -1,4 +1,4 @@
-from app.ai.analyzer import analyze_contract
-from app.ai.assistant import answer_question
+from app.ai.analyzer import analyze_document
+from app.ai.letters import draft_letter
 
-__all__ = ["analyze_contract", "answer_question"]
+__all__ = ["analyze_document", "draft_letter"]

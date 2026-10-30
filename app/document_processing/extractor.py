@@ -1,4 +1,4 @@
-"""Extract text from PDF, DOCX, and plain-text contracts."""
+"""Extract text from PDF, Word, images, and pasted/plain text."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.config import SUPPORTED_EXTENSIONS
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
 
 
 @dataclass
@@ -44,12 +46,23 @@ class ExtractedDocument:
         return len(self.pages)
 
 
+def extract_from_text(text: str, name: str = "pasted-text.txt") -> ExtractedDocument:
+    cleaned = text.strip()
+    notes = [] if cleaned else ["No text was pasted."]
+    return ExtractedDocument(
+        path=Path(name),
+        file_type="txt",
+        pages=[PageText(page_number=1, text=cleaned, failed=not cleaned, note=notes[0] if notes else "")],
+        notes=notes,
+    )
+
+
 def extract_document(path: str | Path) -> ExtractedDocument:
     file_path = Path(path)
     suffix = file_path.suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
         raise ValueError(
-            f"Unsupported file type '{suffix}'. Please upload a PDF, Word, or text document."
+            f"Unsupported file type '{suffix}'. Upload a PDF, Word, image, or text file."
         )
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
@@ -58,20 +71,14 @@ def extract_document(path: str | Path) -> ExtractedDocument:
         return _extract_pdf(file_path)
     if suffix == ".docx":
         return _extract_docx(file_path)
-    if suffix == ".doc":
-        raise ValueError(
-            "Legacy .doc files are not fully supported. Please save the contract as PDF or DOCX and try again."
-        )
+    if suffix in IMAGE_EXTENSIONS:
+        return _extract_image(file_path)
     return _extract_txt(file_path)
 
 
 def _extract_txt(path: Path) -> ExtractedDocument:
     text = path.read_text(encoding="utf-8", errors="replace")
-    return ExtractedDocument(
-        path=path,
-        file_type="txt",
-        pages=[PageText(page_number=1, text=text)],
-    )
+    return ExtractedDocument(path=path, file_type="txt", pages=[PageText(page_number=1, text=text)])
 
 
 def _extract_docx(path: Path) -> ExtractedDocument:
@@ -91,9 +98,7 @@ def _extract_docx(path: Path) -> ExtractedDocument:
             continue
         if "heading" in style:
             if current:
-                pages.append(
-                    PageText(page_number=page_no, text="\n".join(current), heading=heading)
-                )
+                pages.append(PageText(page_number=page_no, text="\n".join(current), heading=heading))
                 page_no += 1
                 current = []
             heading = text
@@ -122,7 +127,7 @@ def _extract_pdf(path: Path) -> ExtractedDocument:
             failed = False
             note = ""
             if len(text) < 40:
-                ocr_text, ocr_note = _ocr_page(page)
+                ocr_text, ocr_note = _ocr_pixmap(page)
                 if ocr_text:
                     text = ocr_text
                     ocr_used = True
@@ -144,6 +149,20 @@ def _extract_pdf(path: Path) -> ExtractedDocument:
     return ExtractedDocument(path=path, file_type="pdf", pages=pages, notes=notes)
 
 
+def _extract_image(path: Path) -> ExtractedDocument:
+    text, note = _ocr_image_file(path)
+    failed = not text
+    notes = [note] if note else []
+    if text:
+        notes.append("Text was read from the image with OCR.")
+    return ExtractedDocument(
+        path=path,
+        file_type=path.suffix.lower().lstrip("."),
+        pages=[PageText(page_number=1, text=text, ocr_used=bool(text), failed=failed, note=note)],
+        notes=notes,
+    )
+
+
 def _guess_heading(text: str) -> str:
     for line in text.splitlines():
         cleaned = line.strip()
@@ -152,14 +171,29 @@ def _guess_heading(text: str) -> str:
     return ""
 
 
-def _ocr_page(page) -> tuple[str, str]:
+def _ocr_image_file(path: Path) -> tuple[str, str]:
+    try:
+        import pytesseract
+        from PIL import Image
+    except Exception:
+        return "", "Install Tesseract OCR to read image files."
+    try:
+        image = Image.open(path)
+        text = pytesseract.image_to_string(image) or ""
+        if not text.strip():
+            return "", "OCR ran but did not find readable text in this image."
+        return text.strip(), ""
+    except Exception as exc:
+        return "", f"Could not read this image ({exc})."
+
+
+def _ocr_pixmap(page) -> tuple[str, str]:
     try:
         import fitz
         import pytesseract
         from PIL import Image
     except Exception:
-        return "", "This page looks scanned. Install Tesseract OCR to enable scanned-PDF reading."
-
+        return "", "This page looks scanned. Install Tesseract OCR to read it."
     try:
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
         image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -168,11 +202,10 @@ def _ocr_page(page) -> tuple[str, str]:
             return "", "OCR ran but did not find readable text on this page."
         return text.strip(), ""
     except Exception as exc:
-        return "", f"OCR is unavailable ({exc}). Scanned pages may be incomplete."
+        return "", f"OCR is unavailable ({exc})."
 
 
 def split_for_model(text: str, max_chars: int = 12000) -> list[str]:
-    """Split long contracts into overlapping sections without silent truncation."""
     if len(text) <= max_chars:
         return [text]
     chunks: list[str] = []

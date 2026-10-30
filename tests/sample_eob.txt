@@ -1,0 +1,30 @@
+EXPLANATION OF BENEFITS
+
+Insurer: Northstar Health Plan
+Member: Jordan Lee
+Member ID: NHL-440291
+Claim Number: CLM-882145
+Date of Service: March 12, 2026
+Provider: Riverside Family Clinic
+Document Type: Explanation of Benefits
+
+This is not a bill.
+
+Billed charges: $1,280.00
+Allowed amount: $640.00
+Plan paid: $400.00
+Patient responsibility: $240.00
+  Deductible applied: $140.00
+  Copay: $40.00
+  Coinsurance (20%): $60.00
+
+Service: Office visit, established patient (CPT 99214)
+Network status: In-network
+Authorization: Not on file
+
+Remark code: CO-45 Charge exceeds fee schedule / maximum allowable.
+Remark code: PR-1 Deductible amount.
+
+If you believe this claim was processed incorrectly, you may file an appeal
+within 180 days of this notice. Send written appeals to Northstar Health Plan,
+Appeals Unit, PO Box 100, Hartford, CT.
